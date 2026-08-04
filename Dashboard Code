@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Temp Workers Visa Dashboard</title>
+  <script src="/vendor/highcharts/highcharts.js"></script>
+  <script src="/vendor/highcharts/modules/accessibility.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highcharts@12.1.2/modules/map.js"></script>
+  <style>
+    :root {
+      --primary: #0052CC;
+      --primary-light: #ebf3ff;
+      --success: #36b37e;
+      --error: #de350b;
+      --warning: #ff991f;
+      --purple: #6554C0;
+      --teal: #00b8d9;
+      --magenta: #c2185b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--color-bg, #f4f5f7);
+      font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+      color: var(--color-text, #172b4d);
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .dashboard-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .dashboard-header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-text, #172b4d);
+      margin-bottom: 6px;
+    }
+
+    .dashboard-header p {
+      color: var(--color-text-muted, #8993a4);
+      font-size: 14px;
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .kpi-card {
+      background: var(--color-surface, #ffffff);
+      border: 1px solid var(--color-border-light, #ebecf0);
+      border-radius: 10px;
+      padding: 16px 18px;
+      text-align: center;
+    }
+
+    .kpi-card .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted, #8993a4);
+      margin-bottom: 4px;
+    }
+
+    .kpi-card .value {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .kpi-card .trend {
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .trend.up { color: var(--success); }
+    .trend.down { color: var(--error); }
+
+    .section-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 0;
+      border-bottom: 2px solid var(--color-border-light, #ebecf0);
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--color-text-muted, #8993a4);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: var(--color-text-secondary, #44546f);
+    }
+
+    .card {
+      background: var(--color-surface, #ffffff);
+      border: 1px solid var(--color-border-light, #ebecf0);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .chart-container {
+      height: 380px;
+    }
+
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 14px 18px;
+      background: var(--color-bg-secondary, #f4f5f7);
+      border-radius: 8px;
+    }
+
+    .controls-row label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text-secondary, #44546f);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .controls-row select, .controls-row input[type="range"] {
+      font-size: 13px;
+      padding: 6px 10px;
+      border: 1px solid var(--color-border, #dfe1e6);
+      border-radius: 6px;
+      background: var(--color-surface, #fff);
+      color: var(--color-text, #172b4d);
+    }
+
+    .scenario-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .scenario-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border: 1px solid var(--color-border-light, #ebecf0);
+      border-radius: 20px;
+      background: var(--color-surface, #fff);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .scenario-toggle.active {
+      border-color: currentColor;
+      background: color-mix(in srgb, currentColor 8%, white);
+    }
+
+    .scenario-toggle .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 800px) {
+      .comparison-grid { grid-template-columns: 1fr; }
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted, #8993a4);
+      border-bottom: 1px solid var(--color-border-light, #ebecf0);
+      position: sticky;
+      top: 0;
+      background: var(--color-surface, #fff);
+    }
+
+    .data-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--color-border-light, #ebecf0);
+      color: var(--color-text-secondary, #44546f);
+    }
+
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: var(--color-bg-secondary, #f9fafb); }
+    .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    .slider-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .slider-container input[type="range"] {
+      width: 140px;
+    }
+
+    .slider-value {
+      font-size: 11px;
+      color: var(--color-text-muted, #8993a4);
+      text-align: center;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .insight-box {
+      background: var(--primary-light);
+      border: 1px solid #b3d4ff;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #0747a6;
+    }
+
+    .insight-box strong { display: block; margin-bottom: 4px; }
+
+    .scenario-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .scenario-detail-card {
+      border: 1px solid var(--color-border-light, #ebecf0);
+      border-radius: 8px;
+      padding: 16px;
+      background: var(--color-surface, #fff);
+    }
+
+    .scenario-detail-card h4 {
+      font-size: 13px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .scenario-detail-card .impact-list {
+      font-size: 12px;
+      color: var(--color-text-secondary, #44546f);
+      list-style: none;
+      padding: 0;
+    }
+
+    .scenario-detail-card .impact-list li {
+      padding: 3px 0;
+      border-bottom: 1px solid var(--color-border-light, #ebecf0);
+    }
+
+    .scenario-detail-card .impact-list li:last-child { border-bottom: none; }
+
+
+    .upload-panel {
+      margin-bottom: 16px;
+    }
+
+    .upload-area {
+      border: 2px dashed var(--color-border, #dfe1e6);
+      border-radius: 10px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .upload-area:hover, .upload-area.dragover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .upload-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .upload-text {
+      font-size: 14px;
+      color: var(--color-text, #172b4d);
+      margin-bottom: 4px;
+    }
+
+    .upload-subtext {
+      font-size: 12px;
+      color: var(--color-text-muted, #8993a4);
+      margin-bottom: 12px;
+    }
+
+    .upload-subtext code {
+      background: var(--color-bg-secondary, #f4f5f7);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 11px;
+    }
+
+    .upload-btn {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .upload-btn:hover {
+      background: #0747a6;
+    }
+
+    .upload-status {
+      border: 1px solid var(--color-border-light, #ebecf0);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .upload-file-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .upload-file-icon {
+      font-size: 16px;
+    }
+
+    #upload-filename {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text, #172b4d);
+      flex: 1;
+    }
+
+    .upload-remove {
+      background: none;
+      border: none;
+      font-size: 16px;
+      color: var(--color-text-muted, #8993a4);
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .upload-remove:hover {
+      background: var(--color-bg-secondary, #f4f5f7);
+      color: var(--error);
+    }
+
+    .upload-preview {
+      max-height: 160px;
+      overflow-y: auto;
+      font-size: 12px;
+    }
+
+    .upload-preview table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .upload-preview th, .upload-preview td {
+      padding: 4px 8px;
+      border: 1px solid var(--color-border-light, #ebecf0);
+      font-size: 11px;
+      text-align: right;
+    }
+
+    .upload-preview th {
+      background: var(--color-bg-secondary, #f4f5f7);
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .resource-section {
+      margin-bottom: 24px;
+    }
+
+    .resource-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .resource-category {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-text-secondary, #44546f);
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--color-border-light, #ebecf0);
+    }
+
+    .resource-item {
+      display: flex;
+      gap: 14px;
+      padding: 12px 14px;
+      border: 1px solid var(--color-border-light, #ebecf0);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .resource-item:hover {
+      border-color: var(--color-border, #dfe1e6);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .resource-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .resource-icon.data { background: #e3f2fd; }
+    .resource-icon.article { background: #fce4ec; }
+    .resource-icon.method { background: #e8f5e9; }
+
+    .resource-info { flex: 1; }
+
+    .resource-info .title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text, #172b4d);
+      margin-bottom: 3px;
+    }
+
+    .resource-info .title a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .resource-info .title a:hover {
+      text-decoration: underline;
+    }
+
+    .resource-info .description {
+      font-size: 12px;
+      color: var(--color-text-muted, #8993a4);
+      line-height: 1.4;
+    }
+
+    .resource-info .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .resource-tag {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--color-bg-secondary, #f4f5f7);
+      color: var(--color-text-secondary, #44546f);
+      font-weight: 500;
+    }
+
+    .resource-count {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--color-text-muted, #8993a4);
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--color-border-light, #ebecf0);
+    }
+
+  </style>
+</head>
+<body>
+
+<div class="dashboard-header">
+  <h1>Temporary Worker Visa Analysis Dashboard</h1>
+  <p>Interactive comparison of H-1B, H-2A, and H-2B visa volumes (2020–2032) with scenario modeling</p>
+</div>
+
+<div class="kpi-row" id="kpi-row"></div>
+
+<div class="section-tabs">
+  <button class="tab-btn active" data-tab="overview">Overview</button>
+  <button class="tab-btn" data-tab="breakdown">Visa Breakdown</button>
+  <button class="tab-btn" data-tab="data">Data Table</button>
+  <button class="tab-btn" data-tab="map">Global Map</button>
+  <button class="tab-btn" data-tab="scenarios">Scenario Comparison</button>
+  <button class="tab-btn" data-tab="custom">Custom Scenario Builder</button>
+  <button class="tab-btn" data-tab="resources">Resources</button>
+</div>
+
+<!-- OVERVIEW TAB -->
+<div class="tab-content active" id="tab-overview">
+  <div class="card" style="margin-top: 16px;">
+    <div class="chart-container" id="chart-overview"></div>
+  </div>
+  <div class="insight-box">
+    <strong>📊 Key Insight</strong>
+    Total temp worker visa volumes are projected to grow from ~767K in 2025 to ~1.24M by 2032 under baseline conditions — a 61% increase driven primarily by H-1B growth (+94%) and steady H-2A agricultural demand.
+  </div>
+  <div class="comparison-grid" style="margin-top: 16px;">
+    <div class="card">
+      <h3 style="font-size: 14px; margin-bottom: 12px;">Resident Population vs. Visa Issuances</h3>
+      <div id="chart-stock-flow" style="height: 260px;"></div>
+    </div>
+    <div class="card">
+      <h3 style="font-size: 14px; margin-bottom: 12px;">Demographics & Context (FY 2024)</h3>
+      <div id="chart-demographics" style="height: 260px;"></div>
+    </div>
+  </div>
+  <div class="insight-box" style="margin-top: 12px; background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20;">
+    <strong>🛡️ COVID Resilience Finding (DHS/OHSS 2025)</strong>
+    Temp worker population grew steadily even during the pandemic (1.42M→1.48M, 2019–2021), while international students fell 20%. This structural resilience suggests that economic demand for temp workers is more robust to disruption than other nonimmigrant categories — informing the moderate baseline assumptions in our recession scenario.
+  </div>
+  <div class="insight-box" style="margin-top: 12px; background: #fff3e0; border-color: #ffcc80; color: #e65100;">
+    <strong>📈 Procyclical Demand & Differential Sensitivity (CRS R47159)</strong>
+    Professional temp worker visas are confirmed procyclical — tracking economic expansion and contraction. During COVID, professional workers (H-1B) saw a <strong>43% drop</strong> in visa issuances, while total H-2A/H-2B seasonal workers remained stable. This validates differential crisis sensitivity: H-1B is 3–4× more volatile than H-2A/H-2B during disruptions. Long-term trend: professional visas doubled from ~200K (1997) to ~425K (2019), outpacing total nonimmigrant growth by 2×.
+  </div>
+</div>
+
+<!-- SCENARIOS TAB -->
+<div class="tab-content" id="tab-scenarios">
+  <div class="card" style="margin-top: 16px;">
+    <div class="controls-row">
+      <span style="font-size: 13px; font-weight: 600;">Toggle Scenarios:</span>
+      <div class="scenario-toggles" id="scenario-toggles"></div>
+    </div>
+    <div class="chart-container" id="chart-scenarios"></div>
+  </div>
+  <div class="scenario-detail-grid">
+    <div class="scenario-detail-card">
+      <h4><span style="color:#0052CC;">●</span> Baseline</h4>
+      <ul class="impact-list">
+        <li>Current growth trajectory maintained</li>
+        <li>No major policy changes or disruptions</li>
+        <li>H-1B: +94% | H-2A: +39% | H-2B: +64%</li>
+      </ul>
+    </div>
+    <div class="scenario-detail-card">
+      <h4><span style="color:#de350b;">●</span> Policy Restriction (−25%)</h4>
+      <ul class="impact-list">
+        <li>25% cap reduction across all categories</li>
+        <li>Phased implementation starting 2025</li>
+        <li>All categories reduced proportionally</li>
+      </ul>
+    </div>
+    <div class="scenario-detail-card">
+      <h4><span style="color:#36b37e;">●</span> Policy Expansion (+30%)</h4>
+      <ul class="impact-list">
+        <li>30% increase in visa allocations</li>
+        <li>Bipartisan reform passes in 2025</li>
+        <li>Strongest growth in H-1B tech sector</li>
+      </ul>
+    </div>
+    <div class="scenario-detail-card">
+      <h4><span style="color:#ff991f;">●</span> Economic Recession (2027)</h4>
+      <ul class="impact-list">
+        <li>Sharp downturn in 2027, gradual recovery</li>
+        <li>Procyclical pattern confirmed by CRS: visas track economic cycles</li>
+        <li>H-1B most sensitive: -43% during COVID (CRS R47159)</li>
+        <li>H-2A/H-2B more resilient (DHS: steady growth through pandemic)</li>
+        <li>Full recovery by 2031–2032</li>
+      </ul>
+    </div>
+    <div class="scenario-detail-card">
+      <h4><span style="color:#00b8d9;">●</span> Natural Disaster (2027)</h4>
+      <ul class="impact-list">
+        <li>Major event (hurricane/wildfire) in 2027</li>
+        <li>H-2A hardest hit (−40%): farm/crop destruction</li>
+        <li>H-2B moderate (−25%): seasonal disruption</li>
+        <li>H-1B minimal (−10%): office-based, insulated</li>
+        <li>Post-disaster rebuilding surge in 2029</li>
+      </ul>
+    </div>
+    <div class="scenario-detail-card">
+      <h4><span style="color:#c2185b;">●</span> Political Instability (2026–2029)</h4>
+      <ul class="impact-list">
+        <li>Sustained policy uncertainty over 3+ years</li>
+        <li>H-1B hardest hit (−30%): politically sensitive (CRS: key focus of policy debate)</li>
+        <li>H-2A somewhat shielded (−15%): bipartisan agricultural support</li>
+        <li>Static caps + per-country limits amplify uncertainty (CRS R47159)</li>
+        <li>Processing delays & employer hesitancy</li>
+        <li>Slow recovery — effects linger through 2031</li>
+      </ul>
+    </div>
+  </div>
+  <div class="comparison-grid">
+    <div class="card">
+      <h3 style="font-size: 14px; margin-bottom: 12px;">2032 Endpoint Comparison</h3>
+      <div class="chart-container" id="chart-endpoint" style="height: 260px;"></div>
+    </div>
+    <div class="card">
+      <h3 style="font-size: 14px; margin-bottom: 12px;">Maximum Drawdown from Baseline</h3>
+      <div class="chart-container" id="chart-drawdown" style="height: 260px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- BREAKDOWN TAB -->
+<div class="tab-content" id="tab-breakdown">
+  <div class="card" style="margin-top: 16px;">
+    <div class="controls-row">
+      <label>View Mode:
+        <select id="breakdown-mode">
+          <option value="stacked">Stacked Area</option>
+          <option value="individual">Individual Lines</option>
+          <option value="percentage">Percentage Share</option>
+        </select>
+      </label>
+      <label>Scenario:
+        <select id="breakdown-scenario">
+          <option value="baseline">Baseline</option>
+          <option value="restriction">Policy Restriction</option>
+          <option value="expansion">Policy Expansion</option>
+          <option value="recession">Economic Recession</option>
+          <option value="disaster">Natural Disaster</option>
+          <option value="political">Political Instability</option>
+        </select>
+      </label>
+    </div>
+    <div class="chart-container" id="chart-breakdown"></div>
+  </div>
+</div>
+
+<!-- CUSTOM SCENARIO TAB -->
+<div class="tab-content" id="tab-custom">
+  <div class="card" style="margin-top: 16px;">
+    <div class="controls-row" style="flex-direction: column; align-items: stretch;">
+      <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Adjust Growth Rate Multipliers & Disruption Events</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+        <div class="slider-container">
+          <label>H-1B Growth: <span id="h1b-val">1.0×</span></label>
+          <input type="range" id="h1b-slider" min="0" max="2" step="0.1" value="1">
+        </div>
+        <div class="slider-container">
+          <label>H-2A Growth: <span id="h2a-val">1.0×</span></label>
+          <input type="range" id="h2a-slider" min="0" max="2" step="0.1" value="1">
+        </div>
+        <div class="slider-container">
+          <label>H-2B Growth: <span id="h2b-val">1.0×</span></label>
+          <input type="range" id="h2b-slider" min="0" max="2" step="0.1" value="1">
+        </div>
+        <div class="slider-container">
+          <label>Disruption Type:
+            <select id="disruption-type">
+              <option value="recession">Recession</option>
+              <option value="disaster">Natural Disaster</option>
+              <option value="political">Political Instability</option>
+              <option value="none">None</option>
+            </select>
+          </label>
+        </div>
+        <div class="slider-container">
+          <label>Disruption Year:
+            <select id="disruption-year">
+              <option value="2026">2026</option>
+              <option value="2027" selected>2027</option>
+              <option value="2028">2028</option>
+              <option value="2029">2029</option>
+              <option value="2030">2030</option>
+            </select>
+          </label>
+        </div>
+        <div class="slider-container">
+          <label>Severity: <span id="severity-val">Medium</span></label>
+          <input type="range" id="severity-slider" min="1" max="3" step="1" value="2">
+        </div>
+      </div>
+    </div>
+    <div class="upload-panel" id="upload-panel">
+      <div class="upload-area" id="upload-area">
+        <div class="upload-icon">📂</div>
+        <div class="upload-text"><strong>Upload Your Own Dataset</strong></div>
+        <div class="upload-subtext">Drag & drop a CSV/Excel file or click to browse.<br>Expected columns: <code>Year, H1B, H2A, H2B</code> (or <code>Year, Total</code>)</div>
+        <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.tsv" style="display:none;">
+        <button class="upload-btn" id="upload-btn">Choose File</button>
+      </div>
+      <div class="upload-status" id="upload-status" style="display:none;">
+        <div class="upload-file-info">
+          <span class="upload-file-icon">✅</span>
+          <span id="upload-filename">dataset.csv</span>
+          <button class="upload-remove" id="upload-remove">✕</button>
+        </div>
+        <div class="upload-preview" id="upload-preview"></div>
+      </div>
+    </div>
+    <div class="chart-container" id="chart-custom"></div>
+    <div class="insight-box" id="custom-insight" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+<!-- DATA TABLE TAB -->
+<div class="tab-content" id="tab-data">
+  <div class="card" style="margin-top: 16px;">
+    <div class="controls-row">
+      <label>Scenario:
+        <select id="table-scenario">
+          <option value="baseline">Baseline</option>
+          <option value="restriction">Policy Restriction</option>
+          <option value="expansion">Policy Expansion</option>
+          <option value="recession">Economic Recession</option>
+          <option value="disaster">Natural Disaster</option>
+          <option value="political">Political Instability</option>
+        </select>
+      </label>
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="data-table" id="full-data-table"></table>
+    </div>
+  </div>
+</div>
+
+<!-- GLOBAL MAP TAB -->
+<div class="tab-content" id="tab-map">
+  <div class="card" style="margin-top: 16px;">
+    <div class="controls-row">
+      <label style="font-weight:700; font-size:13px;">Fiscal Year:</label>
+      <input type="range" id="map-year-slider" min="2019" max="2024" step="1" value="2024" style="width:200px;">
+      <span id="map-year-label" style="font-size:15px; font-weight:700; color:var(--primary);">FY 2024</span>
+      <button id="map-play-btn" style="margin-left:12px; padding:6px 14px; font-size:12px; font-weight:600; border:1px solid var(--color-border,#dfe1e6); border-radius:6px; background:var(--color-surface,#fff); cursor:pointer;">▶ Play</button>
+      <label style="margin-left: auto;">
+        Metric:
+        <select id="map-metric">
+          <option value="temp_workers">Temp Workers (estimated)</option>
+          <option value="total_pop">Total Nonimmigrant Pop.</option>
+          <option value="growth">Growth Rate (%)</option>
+        </select>
+      </label>
+    </div>
+    <div id="chart-map" style="height: 420px;"></div>
+    <div class="comparison-grid" style="margin-top: 16px;">
+      <div class="card" style="padding: 14px;">
+        <h4 style="font-size: 13px; margin-bottom: 10px;">Top Sending Countries</h4>
+        <div id="map-ranking"></div>
+      </div>
+      <div class="card" style="padding: 14px;">
+        <h4 style="font-size: 13px; margin-bottom: 10px;">Selected Country Trend</h4>
+        <div id="chart-country-trend" style="height: 200px;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <strong>🌍 Source Note</strong>
+    Country data derived from DHS/OHSS Population Estimates (FY 2019–2024). Temp worker volumes estimated using country-level temp worker share percentages applied to total population figures. India (47%) and Mexico (22%) together account for nearly 70% of all temporary workers residing in the U.S.
+  </div>
+</div>
+
+<!-- RESOURCES TAB -->
+<div class="tab-content" id="tab-resources">
+  <div class="card" style="margin-top: 16px;">
+    <h3 style="font-size: 16px; margin-bottom: 6px;">📚 Data Sources & References</h3>
+    <p style="font-size: 13px; color: var(--color-text-muted, #8993a4); margin-bottom: 20px;">All resources used to build and calibrate this dashboard's projections and scenarios.</p>
+    
+    <div class="resource-section">
+      <h4 class="resource-category">📊 Primary Data</h4>
+      <div class="resource-list" id="resource-data"></div>
+    </div>
+
+    <div class="resource-section">
+      <h4 class="resource-category">📄 Research Articles & Reports</h4>
+      <div class="resource-list" id="resource-articles"></div>
+    </div>
+
+    <div class="resource-section">
+      <h4 class="resource-category">🔧 Methodology Notes</h4>
+      <div class="resource-list" id="resource-methods"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ====== DATA ======
+const historicalYears = [2020, 2021, 2022, 2023, 2024];
+const projectedYears = [2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032];
+const allYears = [...historicalYears, ...projectedYears];
+
+const h1b = [124983, 61569, 206002, 265777, 219659, 293666, 333022, 372378, 411734, 451090, 490446, 529802, 569158];
+const h2a = [213394, 257898, 298336, 310676, 315328, 327007, 342967, 358927, 374887, 390847, 406807, 422767, 438727];
+const h2b = [61864, 95053, 124644, 131704, 139541, 146035, 157860, 169684, 181509, 193333, 205158, 216983, 228807];
+const totals = allYears.map((_, i) => h1b[i] + h2a[i] + h2b[i]);
+
+// Projected only (for scenarios)
+const h1b_proj = h1b.slice(5);
+const h2a_proj = h2a.slice(5);
+const h2b_proj = h2b.slice(5);
+
+// Scenario data (2025-2032 only)
+const scenarios = {
+  baseline:    { name: 'Baseline', color: '#0052CC', dash: 'Solid', data: [744798, 815068, 885338, 955608, 1025878, 1096148, 1166418, 1236688], desc: 'Current growth trajectory maintained' },
+  restriction: { name: 'Policy Restriction (−25%)', color: '#de350b', dash: 'ShortDash', data: [532247, 558599, 584949, 611302, 637652, 664003, 690356, 716706], desc: '25% cap reduction across all categories' },
+  expansion:   { name: 'Policy Expansion (+30%)', color: '#36b37e', dash: 'ShortDash', data: [995643, 1114399, 1233155, 1351911, 1470668, 1589424, 1708180, 1826936], desc: '30% increase in visa allocations' },
+  recession:   { name: 'Economic Recession (2027)', color: '#ff991f', dash: 'ShortDot', data: [723718, 772906, 534361, 667985, 813085, 969662, 1018850, 1068040], desc: 'Sharp downturn in 2027, gradual recovery' },
+  disaster:    { name: 'Natural Disaster (2027)', color: '#00b8d9', dash: 'DashDot', data: [766708, 833849, 677759, 873158, 1064478, 1114650, 1169552, 1236692], desc: 'Major disaster in 2027, H-2A hardest hit, post-rebuild surge' },
+  political:   { name: 'Political Instability (2026–29)', color: '#c2185b', dash: 'LongDash', data: [766708, 779007, 693014, 783907, 897671, 1018663, 1125925, 1216343], desc: 'Sustained uncertainty, H-1B hardest hit, slow recovery' },
+};
+
+// Per-category breakdown for each scenario
+const scenarioBreakdown = {
+  baseline: { h1b: h1b_proj, h2a: h2a_proj, h2b: h2b_proj },
+  restriction: {
+    h1b: h1b_proj.map(v => Math.round(v * 0.72)),
+    h2a: h2a_proj.map(v => Math.round(v * 0.72)),
+    h2b: h2b_proj.map(v => Math.round(v * 0.72)),
+  },
+  expansion: {
+    h1b: h1b_proj.map(v => Math.round(v * 1.35)),
+    h2a: h2a_proj.map(v => Math.round(v * 1.30)),
+    h2b: h2b_proj.map(v => Math.round(v * 1.30)),
+  },
+  recession: {
+    h1b: [293666, 333022, 260664, 329388, 406481, 465723, 504112, 543236],
+    h2a: [327007, 342967, 179436, 228597, 290033, 357447, 370738, 384081],
+    h2b: [146035, 157860, 94261, 110000, 116571, 146492, 144000, 140723],
+  },
+  disaster: {
+    h1b: [293666, 333022, 335140, 391147, 451090, 490446, 529802, 569158],
+    h2a: [327007, 342967, 215356, 318654, 410389, 414943, 422767, 438727],
+    h2b: [146035, 157860, 127263, 163357, 203000, 209261, 216983, 228807],
+  },
+  political: {
+    h1b: [293666, 306381, 260664, 308800, 369893, 441401, 503312, 557775],
+    h2a: [327007, 325819, 305088, 329900, 359579, 386467, 414312, 434340],
+    h2b: [146035, 146807, 127262, 145207, 168199, 190795, 208301, 224228],
+  },
+};
+
+const fmt = n => n.toLocaleString();
+
+// ====== KPIs ======
+const kpiRow = document.getElementById('kpi-row');
+const latestTotal = totals[totals.length - 1];
+const prevTotal = totals[totals.length - 2];
+const growthPct = ((latestTotal - prevTotal) / prevTotal * 100).toFixed(1);
+const cagr = ((Math.pow(latestTotal / totals[4], 1/8) - 1) * 100).toFixed(1);
+
+const kpis = [
+  { label: '2032 Projected Total', value: fmt(latestTotal), trend: `+${growthPct}% from 2031`, up: true },
+  { label: '2024 Actual Total', value: fmt(totals[4]), trend: '−4.7% from 2023', up: false },
+  { label: 'CAGR (2024–2032)', value: `${cagr}%`, trend: 'Compound annual growth', up: true },
+  { label: 'Resident Population (2024)', value: '1.70M', trend: '↑ +60K/yr steady growth (DHS)', up: true },
+];
+
+kpis.forEach(k => {
+  kpiRow.innerHTML += `<div class="kpi-card">
+    <div class="label">${k.label}</div>
+    <div class="value">${k.value}</div>
+    <div class="trend ${k.up ? 'up' : 'down'}">${k.up ? '↑' : '↓'} ${k.trend}</div>
+  </div>`;
+});
+
+// ====== TABS ======
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    window.dispatchEvent(new Event('resize'));
+  });
+});
+
+// ====== CHART: OVERVIEW ======
+Highcharts.chart('chart-overview', {
+  chart: { type: 'area', backgroundColor: 'transparent' },
+  title: { text: 'Total Temp Worker Visa Volumes (2020–2032)', style: { fontSize: '15px', fontWeight: '600' } },
+  xAxis: {
+    categories: allYears.map(String),
+    plotBands: [{ from: 4.5, to: 12.5, color: 'rgba(0,82,204,0.04)', label: { text: 'Projected', style: { color: '#8993a4', fontSize: '11px' }, y: 15 } }],
+  },
+  yAxis: { title: { text: 'Visa Volume' }, labels: { format: '{value:,.0f}' } },
+  tooltip: { shared: true, pointFormat: '<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.0f}</b><br/>' },
+  plotOptions: {
+    area: { stacking: 'normal', lineWidth: 2, marker: { radius: 3 }, fillOpacity: 0.15 },
+  },
+  colors: ['#0052CC', '#36b37e', '#ff991f'],
+  series: [
+    { name: 'H-1B', data: h1b },
+    { name: 'H-2A', data: h2a },
+    { name: 'H-2B', data: h2b },
+  ],
+  credits: { enabled: false },
+});
+
+// ====== CHART: STOCK VS FLOW (Resident Pop vs Visas Issued) ======
+Highcharts.chart('chart-stock-flow', {
+  chart: { backgroundColor: 'transparent' },
+  title: { text: null },
+  xAxis: { categories: ['2019','2020','2021','2022','2023','2024'] },
+  yAxis: [
+    { title: { text: 'Resident Population', style: { color: '#6554C0' } }, labels: { format: '{value:,.0f}' } },
+    { title: { text: 'Visas Issued', style: { color: '#0052CC' } }, labels: { format: '{value:,.0f}' }, opposite: true },
+  ],
+  tooltip: { shared: true, pointFormat: '<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.0f}</b><br/>' },
+  series: [
+    { name: 'Resident Temp Workers (DHS)', data: [1420000, 1480000, 1480000, 1540000, 1640000, 1700000], type: 'area', color: '#6554C0', fillOpacity: 0.1, yAxis: 0 },
+    { name: 'Visas Issued (H1B+H2A+H2B)', data: [400241, 414520, 628982, 708157, 674528, 674528], type: 'column', color: '#0052CC', opacity: 0.7, yAxis: 1 },
+  ],
+  credits: { enabled: false },
+});
+
+// ====== CHART: DEMOGRAPHICS PIE ======
+Highcharts.chart('chart-demographics', {
+  chart: { type: 'pie', backgroundColor: 'transparent' },
+  title: { text: 'Top Sending Countries', style: { fontSize: '13px' } },
+  subtitle: { text: 'Share of Temp Worker Population' },
+  plotOptions: {
+    pie: {
+      innerSize: '50%',
+      dataLabels: { format: '{point.name}: {point.percentage:.0f}%', style: { fontSize: '11px' } },
+    },
+  },
+  colors: ['#0052CC', '#36b37e', '#ff991f', '#6554C0', '#8993a4'],
+  series: [{
+    name: 'Share',
+    data: [
+      { name: 'India', y: 47 },
+      { name: 'Mexico', y: 22 },
+      { name: 'China', y: 5 },
+      { name: 'Canada', y: 4 },
+      { name: 'All Others', y: 22 },
+    ],
+  }],
+  credits: { enabled: false },
+});
+
+
+// ====== CHART: SCENARIOS ======
+let activeScenarios = { baseline: true, restriction: true, expansion: true, recession: true, disaster: true, political: true };
+
+function renderScenarioChart() {
+  const series = Object.entries(scenarios).filter(([k]) => activeScenarios[k]).map(([_, s]) => ({
+    name: s.name, data: s.data, color: s.color, dashStyle: s.dash,
+    lineWidth: s.name === 'Baseline' ? 3 : 2,
+    marker: { radius: 3 },
+  }));
+
+  Highcharts.chart('chart-scenarios', {
+    chart: { type: 'line', backgroundColor: 'transparent' },
+    title: { text: 'What-If Scenario Comparison (2025–2032)', style: { fontSize: '15px', fontWeight: '600' } },
+    xAxis: { categories: projectedYears.map(String), title: { text: 'Year' } },
+    yAxis: { title: { text: 'Total Visa Volume' }, labels: { format: '{value:,.0f}' } },
+    tooltip: { shared: true, pointFormat: '<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.0f}</b><br/>' },
+    series: series,
+    credits: { enabled: false },
+  });
+}
+
+// Scenario toggles
+const toggleContainer = document.getElementById('scenario-toggles');
+Object.entries(scenarios).forEach(([key, sc]) => {
+  const el = document.createElement('div');
+  el.className = 'scenario-toggle active';
+  el.style.color = sc.color;
+  el.innerHTML = `<span class="dot" style="background:${sc.color}"></span>${sc.name.split('(')[0].trim().split(' ').slice(0,2).join(' ')}`;
+  el.addEventListener('click', () => {
+    activeScenarios[key] = !activeScenarios[key];
+    el.classList.toggle('active');
+    renderScenarioChart();
+  });
+  toggleContainer.appendChild(el);
+});
+
+renderScenarioChart();
+
+// Endpoint comparison bar chart
+Highcharts.chart('chart-endpoint', {
+  chart: { type: 'bar', backgroundColor: 'transparent' },
+  title: { text: null },
+  xAxis: { categories: Object.values(scenarios).map(s => s.name.split('(')[0].trim()), labels: { style: { fontSize: '11px' } } },
+  yAxis: { title: { text: null }, labels: { format: '{value:,.0f}' } },
+  tooltip: { pointFormat: '2032 Volume: <b>{point.y:,.0f}</b> visas' },
+  plotOptions: { bar: { dataLabels: { enabled: true, format: '{y:,.0f}' } } },
+  series: [{ name: '2032 Volume', data: Object.values(scenarios).map(s => s.data[7]), colorByPoint: true, colors: Object.values(scenarios).map(s => s.color) }],
+  legend: { enabled: false },
+  credits: { enabled: false },
+});
+
+// Maximum drawdown chart
+const drawdowns = Object.entries(scenarios).map(([k, s]) => {
+  const baseline = scenarios.baseline.data;
+  const maxDraw = Math.min(...s.data.map((v, i) => ((v - baseline[i]) / baseline[i]) * 100));
+  return { name: s.name.split('(')[0].trim(), y: Math.round(maxDraw * 10) / 10, color: s.color };
+});
+
+Highcharts.chart('chart-drawdown', {
+  chart: { type: 'bar', backgroundColor: 'transparent' },
+  title: { text: null },
+  xAxis: { categories: drawdowns.map(d => d.name), labels: { style: { fontSize: '11px' } } },
+  yAxis: { title: { text: null }, labels: { format: '{value}%' }, max: 5 },
+  tooltip: { pointFormat: 'Max deviation: <b>{point.y}%</b> from baseline' },
+  plotOptions: { bar: { dataLabels: { enabled: true, format: '{y}%' } } },
+  series: [{ name: 'Max Drawdown', data: drawdowns.map(d => ({ y: d.y, color: d.color })) }],
+  legend: { enabled: false },
+  credits: { enabled: false },
+});
+
+// ====== CHART: BREAKDOWN ======
+function renderBreakdown() {
+  const mode = document.getElementById('breakdown-mode').value;
+  const scen = document.getElementById('breakdown-scenario').value;
+  const bd = scenarioBreakdown[scen];
+
+  // For non-projected years, always show historical
+  const fullH1b = [...h1b.slice(0, 5), ...bd.h1b];
+  const fullH2a = [...h2a.slice(0, 5), ...bd.h2a];
+  const fullH2b = [...h2b.slice(0, 5), ...bd.h2b];
+
+  let config;
+  if (mode === 'stacked') {
+    config = {
+      chart: { type: 'area', backgroundColor: 'transparent' },
+      title: { text: `Visa Breakdown — ${scenarios[scen].name}`, style: { fontSize: '15px', fontWeight: '600' } },
+      plotOptions: { area: { stacking: 'normal', fillOpacity: 0.4, marker: { radius: 2 } } },
+    };
+  } else if (mode === 'percentage') {
+    config = {
+      chart: { type: 'area', backgroundColor: 'transparent' },
+      title: { text: `Visa Breakdown (%) — ${scenarios[scen].name}`, style: { fontSize: '15px', fontWeight: '600' } },
+      plotOptions: { area: { stacking: 'percent', fillOpacity: 0.4, marker: { radius: 2 } } },
+      yAxis: { labels: { format: '{value}%' } },
+      tooltip: { pointFormat: '<span style="color:{series.color}">●</span> {series.name}: <b>{point.percentage:.1f}%</b> ({point.y:,.0f})<br/>' },
+    };
+  } else {
+    config = {
+      chart: { type: 'line', backgroundColor: 'transparent' },
+      title: { text: `Visa Breakdown — ${scenarios[scen].name}`, style: { fontSize: '15px', fontWeight: '600' } },
+      plotOptions: { line: { marker: { radius: 3 } } },
+    };
+  }
+
+  Highcharts.chart('chart-breakdown', {
+    ...config,
+    xAxis: { categories: allYears.map(String), plotBands: [{ from: 4.5, to: 12.5, color: 'rgba(0,82,204,0.04)' }] },
+    yAxis: { title: { text: mode === 'percentage' ? 'Share (%)' : 'Visa Volume' }, labels: { format: mode === 'percentage' ? '{value}%' : '{value:,.0f}' }, ...(config.yAxis || {}) },
+    tooltip: { shared: true, ...(config.tooltip || {}), pointFormat: config.tooltip?.pointFormat || '<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.0f}</b><br/>' },
+    series: [
+      { name: 'H-1B', data: fullH1b, color: '#0052CC', lineWidth: 2 },
+      { name: 'H-2A', data: fullH2a, color: '#36b37e', lineWidth: 2 },
+      { name: 'H-2B', data: fullH2b, color: '#ff991f', lineWidth: 2 },
+    ],
+    credits: { enabled: false },
+  });
+}
+
+document.getElementById('breakdown-mode').addEventListener('change', renderBreakdown);
+document.getElementById('breakdown-scenario').addEventListener('change', renderBreakdown);
+renderBreakdown();
+
+// ====== CHART: CUSTOM SCENARIO ======
+let uploadedData = null;
+
+function renderCustom() {
+  const h1bMult = parseFloat(document.getElementById('h1b-slider').value);
+  const h2aMult = parseFloat(document.getElementById('h2a-slider').value);
+  const h2bMult = parseFloat(document.getElementById('h2b-slider').value);
+  const disType = document.getElementById('disruption-type').value;
+  const disYear = parseInt(document.getElementById('disruption-year').value);
+  const severity = parseInt(document.getElementById('severity-slider').value);
+  const sevLabels = ['Low', 'Medium', 'High'];
+
+  document.getElementById('h1b-val').textContent = h1bMult.toFixed(1) + '×';
+  document.getElementById('h2a-val').textContent = h2aMult.toFixed(1) + '×';
+  document.getElementById('h2b-val').textContent = h2bMult.toFixed(1) + '×';
+  document.getElementById('severity-val').textContent = sevLabels[severity - 1];
+
+  const h1bGrowth = (h1b[4] - h1b[0]) / 4;
+  const h2aGrowth = (h2a[4] - h2a[0]) / 4;
+  const h2bGrowth = (h2b[4] - h2b[0]) / 4;
+  const sevMult = severity * 0.4; // 0.4, 0.8, 1.2
+
+  const customH1b = [], customH2a = [], customH2b = [], customTotal = [];
+
+  for (let i = 0; i < 8; i++) {
+    let ch1 = h1b[4] + h1bGrowth * (i + 1) * h1bMult;
+    let ch2a_v = h2a[4] + h2aGrowth * (i + 1) * h2aMult;
+    let ch2b_v = h2b[4] + h2bGrowth * (i + 1) * h2bMult;
+    const year = 2025 + i;
+
+    if (disType !== 'none') {
+      const yearDiff = year - disYear;
+
+      if (disType === 'recession') {
+        if (yearDiff === 0) { ch1 *= (1 - 0.3 * sevMult); ch2a_v *= (1 - 0.2 * sevMult); ch2b_v *= (1 - 0.25 * sevMult); }
+        else if (yearDiff === 1) { ch1 *= (1 - 0.15 * sevMult); ch2a_v *= (1 - 0.1 * sevMult); ch2b_v *= (1 - 0.12 * sevMult); }
+        else if (yearDiff === 2) { ch1 *= (1 - 0.05 * sevMult); }
+      } else if (disType === 'disaster') {
+        if (yearDiff === 0) { ch1 *= (1 - 0.1 * sevMult); ch2a_v *= (1 - 0.4 * sevMult); ch2b_v *= (1 - 0.25 * sevMult); }
+        else if (yearDiff === 1) { ch1 *= (1 - 0.03 * sevMult); ch2a_v *= (1 - 0.12 * sevMult); ch2b_v *= (1 - 0.08 * sevMult); }
+        else if (yearDiff === 2) { ch2a_v *= (1 + 0.05 * sevMult); ch2b_v *= (1 + 0.05 * sevMult); } // rebuild surge
+      } else if (disType === 'political') {
+        if (yearDiff >= -1 && yearDiff <= 0) { ch1 *= (1 - 0.08 * sevMult); ch2a_v *= (1 - 0.05 * sevMult); ch2b_v *= (1 - 0.07 * sevMult); }
+        if (yearDiff === 1) { ch1 *= (1 - 0.3 * sevMult); ch2a_v *= (1 - 0.15 * sevMult); ch2b_v *= (1 - 0.25 * sevMult); }
+        else if (yearDiff === 2) { ch1 *= (1 - 0.25 * sevMult); ch2a_v *= (1 - 0.12 * sevMult); ch2b_v *= (1 - 0.2 * sevMult); }
+        else if (yearDiff === 3) { ch1 *= (1 - 0.15 * sevMult); ch2a_v *= (1 - 0.08 * sevMult); ch2b_v *= (1 - 0.1 * sevMult); }
+        else if (yearDiff === 4) { ch1 *= (1 - 0.08 * sevMult); ch2a_v *= (1 - 0.03 * sevMult); ch2b_v *= (1 - 0.05 * sevMult); }
+      }
+    }
+
+    customH1b.push(Math.round(Math.max(0, ch1)));
+    customH2a.push(Math.round(Math.max(0, ch2a_v)));
+    customH2b.push(Math.round(Math.max(0, ch2b_v)));
+    customTotal.push(Math.round(Math.max(0, ch1) + Math.max(0, ch2a_v) + Math.max(0, ch2b_v)));
+  }
+
+  // Also show baseline for reference
+  Highcharts.chart('chart-custom', {
+    chart: { backgroundColor: 'transparent' },
+    title: { text: 'Custom Scenario Projection (2025–2032)', style: { fontSize: '15px', fontWeight: '600' } },
+    xAxis: { categories: projectedYears.map(String) },
+    yAxis: { title: { text: 'Visa Volume' }, labels: { format: '{value:,.0f}' } },
+    tooltip: { shared: true, pointFormat: '<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.0f}</b><br/>' },
+    series: [
+      { name: 'Custom Total', data: customTotal, type: 'area', color: '#6554C0', lineWidth: 3, fillOpacity: 0.1 },
+      { name: 'H-1B', data: customH1b, type: 'line', color: '#0052CC', lineWidth: 1.5, dashStyle: 'Dash' },
+      { name: 'H-2A', data: customH2a, type: 'line', color: '#36b37e', lineWidth: 1.5, dashStyle: 'Dash' },
+      { name: 'H-2B', data: customH2b, type: 'line', color: '#ff991f', lineWidth: 1.5, dashStyle: 'Dash' },
+      { name: 'Baseline Total', data: scenarios.baseline.data, type: 'line', color: '#999', lineWidth: 1.5, dashStyle: 'Dot' },
+      ...(uploadedData ? [{
+        name: 'Your Data (Total)',
+        data: projectedYears.map(yr => {
+          const idx = uploadedData.years.indexOf(yr);
+          return idx >= 0 ? uploadedData.total[idx] : null;
+        }),
+        type: 'line', color: '#c2185b', lineWidth: 3, marker: { radius: 6, symbol: 'diamond' },
+        dashStyle: 'Solid', zIndex: 10,
+      }] : []),
+      ...(uploadedData && uploadedData.hasCategories ? [
+        { name: 'Your H-1B', data: projectedYears.map(yr => { const i = uploadedData.years.indexOf(yr); return i >= 0 ? uploadedData.h1b[i] : null; }), type: 'line', color: '#0052CC', lineWidth: 2, marker: { radius: 5, symbol: 'diamond' } },
+        { name: 'Your H-2A', data: projectedYears.map(yr => { const i = uploadedData.years.indexOf(yr); return i >= 0 ? uploadedData.h2a[i] : null; }), type: 'line', color: '#36b37e', lineWidth: 2, marker: { radius: 5, symbol: 'diamond' } },
+        { name: 'Your H-2B', data: projectedYears.map(yr => { const i = uploadedData.years.indexOf(yr); return i >= 0 ? uploadedData.h2b[i] : null; }), type: 'line', color: '#ff991f', lineWidth: 2, marker: { radius: 5, symbol: 'diamond' } },
+      ] : []),
+    ],
+    credits: { enabled: false },
+  });
+
+  // Insight text
+  const endDiff = ((customTotal[7] - scenarios.baseline.data[7]) / scenarios.baseline.data[7] * 100).toFixed(1);
+  const minVal = Math.min(...customTotal);
+  const minYear = 2025 + customTotal.indexOf(minVal);
+  document.getElementById('custom-insight').innerHTML = `<strong>📊 Custom Scenario Summary</strong>
+    Your custom scenario reaches <b>${fmt(customTotal[7])}</b> by 2032 (${endDiff > 0 ? '+' : ''}${endDiff}% vs. baseline).
+    The lowest point is <b>${fmt(minVal)}</b> in ${minYear}.
+    ${disType !== 'none' ? `Disruption type: <b>${disType}</b> in ${disYear} at ${sevLabels[severity-1].toLowerCase()} severity.` : 'No disruption event applied.'}`;
+}
+
+['h1b-slider', 'h2a-slider', 'h2b-slider', 'severity-slider', 'disruption-year', 'disruption-type'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderCustom);
+  document.getElementById(id).addEventListener('change', renderCustom);
+});
+renderCustom();
+
+// ====== DATA TABLE ======
+function renderTable() {
+  const scen = document.getElementById('table-scenario').value;
+  const bd = scenarioBreakdown[scen];
+  const tableEl = document.getElementById('full-data-table');
+
+  let html = '<tr><th>Year</th><th class="num">H-1B</th><th class="num">H-2A</th><th class="num">H-2B</th><th class="num">Total</th><th class="num">Δ Baseline</th><th>Status</th></tr>';
+
+  allYears.forEach((yr, i) => {
+    const isProj = yr >= 2025;
+    const projIdx = i - 5;
+    const ch1 = isProj ? bd.h1b[projIdx] : h1b[i];
+    const ch2a = isProj ? bd.h2a[projIdx] : h2a[i];
+    const ch2b = isProj ? bd.h2b[projIdx] : h2b[i];
+    const total = ch1 + ch2a + ch2b;
+    const baselineVal = isProj ? scenarios.baseline.data[projIdx] : totals[i];
+    const delta = isProj ? ((total - baselineVal) / baselineVal * 100).toFixed(1) : '—';
+    const deltaColor = delta === '—' ? '' : (parseFloat(delta) >= 0 ? 'color:#36b37e' : 'color:#de350b');
+    const status = !isProj ? '<span style="color:#36b37e">● Actual</span>' : '<span style="color:#0052CC">◐ Projected</span>';
+
+    html += `<tr><td><strong>${yr}</strong></td><td class="num">${fmt(ch1)}</td><td class="num">${fmt(ch2a)}</td><td class="num">${fmt(ch2b)}</td><td class="num"><strong>${fmt(total)}</strong></td><td class="num" style="${deltaColor}">${delta === '—' ? '—' : delta + '%'}</td><td>${status}</td></tr>`;
+  });
+
+  tableEl.innerHTML = html;
+}
+
+document.getElementById('table-scenario').addEventListener('change', renderTable);
+renderTable();
+
+
+
+// ====== GLOBAL MAP ======
+// Country data from DHS Population Estimates (FY2019-2024)
+// Total nonimmigrant population by country
+const countryPopData = {
+  'in': { name: 'India', pop: [910000, 950000, 960000, 1000000, 1080000, 1190000], twShare: 0.70 },
+  'mx': { name: 'Mexico', pop: [280000, 300000, 330000, 390000, 430000, 410000], twShare: 0.90 },
+  'cn': { name: 'China', pop: [480000, 480000, 350000, 430000, 410000, 400000], twShare: 0.13 },
+  'ca': { name: 'Canada', pop: [140000, 120000, 120000, 120000, 130000, 130000], twShare: 0.45 },
+  'kr': { name: 'South Korea', pop: [100000, 90000, 80000, 90000, 100000, 100000], twShare: 0.20 },
+  'jp': { name: 'Japan', pop: [90000, 80000, 70000, 80000, 80000, 80000], twShare: 0.25 },
+  'br': { name: 'Brazil', pop: [70000, 80000, 70000, 70000, 80000, 80000], twShare: 0.35 },
+  'gb': { name: 'United Kingdom', pop: [70000, 60000, 60000, 60000, 60000, 60000], twShare: 0.30 },
+  'ph': { name: 'Philippines', pop: [40000, 40000, 40000, 40000, 50000, 60000], twShare: 0.30 },
+  'co': { name: 'Colombia', pop: [30000, 30000, 30000, 40000, 40000, 40000], twShare: 0.25 },
+  'au': { name: 'Australia', pop: [30000, 25000, 22000, 28000, 32000, 35000], twShare: 0.35 },
+  'de': { name: 'Germany', pop: [25000, 22000, 20000, 22000, 25000, 28000], twShare: 0.30 },
+  'fr': { name: 'France', pop: [20000, 18000, 16000, 18000, 20000, 22000], twShare: 0.25 },
+  'il': { name: 'Israel', pop: [18000, 16000, 15000, 17000, 19000, 20000], twShare: 0.40 },
+  'ng': { name: 'Nigeria', pop: [15000, 14000, 12000, 14000, 17000, 20000], twShare: 0.30 },
+  'tw': { name: 'Taiwan', pop: [25000, 22000, 20000, 22000, 24000, 25000], twShare: 0.25 },
+  'pk': { name: 'Pakistan', pop: [12000, 11000, 10000, 12000, 14000, 16000], twShare: 0.35 },
+  'gt': { name: 'Guatemala', pop: [10000, 12000, 14000, 18000, 22000, 25000], twShare: 0.85 },
+  'za': { name: 'South Africa', pop: [10000, 9000, 8000, 9000, 10000, 11000], twShare: 0.30 },
+  'jm': { name: 'Jamaica', pop: [8000, 9000, 10000, 12000, 14000, 15000], twShare: 0.80 },
+};
+
+const mapYears = [2019, 2020, 2021, 2022, 2023, 2024];
+const mapYearSlider = document.getElementById('map-year-slider');
+const mapYearLabel = document.getElementById('map-year-label');
+const mapMetric = document.getElementById('map-metric');
+const mapPlayBtn = document.getElementById('map-play-btn');
+let mapChart = null;
+let mapPlaying = false;
+let mapInterval = null;
+let selectedCountry = 'in';
+
+function getMapData(yearIdx, metric) {
+  return Object.entries(countryPopData).map(([code, d]) => {
+    const pop = d.pop[yearIdx];
+    const tw = Math.round(pop * d.twShare);
+    let value;
+    if (metric === 'temp_workers') value = tw;
+    else if (metric === 'total_pop') value = pop;
+    else {
+      // growth rate
+      if (yearIdx === 0) value = 0;
+      else {
+        const prev = d.pop[yearIdx - 1];
+        value = Math.round(((pop - prev) / prev) * 1000) / 10;
+      }
+    }
+    return { 'hc-key': code, value: value, name: d.name, tempWorkers: tw, totalPop: pop };
+  });
+}
+
+function renderMap() {
+  const yearIdx = parseInt(mapYearSlider.value) - 2019;
+  const metric = mapMetric.value;
+  mapYearLabel.textContent = 'FY ' + mapYears[yearIdx];
+
+  const data = getMapData(yearIdx, metric);
+  const isGrowth = metric === 'growth';
+
+  const metricLabels = {
+    temp_workers: 'Estimated Temp Workers',
+    total_pop: 'Total Nonimmigrant Population',
+    growth: 'Year-over-Year Growth (%)',
+  };
+
+  // Fetch map topology
+  if (!mapChart) {
+    fetch('https://cdn.jsdelivr.net/npm/@highcharts/map-collection@2.3.2/custom/world.topo.json')
+      .then(r => r.json())
+      .then(topology => {
+        mapChart = Highcharts.mapChart('chart-map', {
+          chart: { map: topology, backgroundColor: 'transparent' },
+          title: { text: null },
+          mapNavigation: { enabled: true, buttonOptions: { verticalAlign: 'bottom' } },
+          colorAxis: {
+            min: isGrowth ? -20 : 0,
+            max: isGrowth ? 50 : undefined,
+            stops: isGrowth
+              ? [[0, '#de350b'], [0.4, '#fff3e0'], [1, '#36b37e']]
+              : [[0, '#ebf3ff'], [0.05, '#b3d4ff'], [0.2, '#4c9aff'], [0.5, '#0052CC'], [1, '#0747a6']],
+            labels: { format: isGrowth ? '{value}%' : '{value:,.0f}' },
+          },
+          tooltip: {
+            formatter: function() {
+              if (!this.point || !this.point.name) return false;
+              const p = this.point;
+              return '<b>' + p.name + '</b><br/>' +
+                'Temp Workers: <b>' + fmt(p.tempWorkers || 0) + '</b><br/>' +
+                'Total Pop: <b>' + fmt(p.totalPop || 0) + '</b><br/>' +
+                metricLabels[metric] + ': <b>' + (isGrowth ? (p.value || 0) + '%' : fmt(p.value || 0)) + '</b>';
+            },
+          },
+          series: [{
+            data: data,
+            joinBy: 'hc-key',
+            name: metricLabels[metric],
+            states: { hover: { color: '#ff991f' } },
+            cursor: 'pointer',
+            point: {
+              events: {
+                click: function() {
+                  const code = this['hc-key'];
+                  if (countryPopData[code]) {
+                    selectedCountry = code;
+                    renderCountryTrend();
+                    renderRanking(parseInt(mapYearSlider.value) - 2019);
+                  }
+                },
+              },
+            },
+          }],
+          credits: { enabled: false },
+        });
+        renderRanking(yearIdx);
+        renderCountryTrend();
+      });
+  } else {
+    mapChart.series[0].setData(data, true);
+    mapChart.colorAxis[0].update({
+      min: isGrowth ? -20 : 0,
+      max: isGrowth ? 50 : undefined,
+      stops: isGrowth
+        ? [[0, '#de350b'], [0.4, '#fff3e0'], [1, '#36b37e']]
+        : [[0, '#ebf3ff'], [0.05, '#b3d4ff'], [0.2, '#4c9aff'], [0.5, '#0052CC'], [1, '#0747a6']],
+    });
+    renderRanking(yearIdx);
+  }
+}
+
+function renderRanking(yearIdx) {
+  const rankings = Object.entries(countryPopData)
+    .map(([code, d]) => ({ code, name: d.name, tw: Math.round(d.pop[yearIdx] * d.twShare), selected: code === selectedCountry }))
+    .sort((a, b) => b.tw - a.tw)
+    .slice(0, 8);
+
+  const maxTw = rankings[0].tw;
+  document.getElementById('map-ranking').innerHTML = rankings.map((r, i) => {
+    const pct = (r.tw / maxTw * 100).toFixed(0);
+    const highlight = r.selected ? 'border-left: 3px solid var(--primary); padding-left: 8px;' : 'padding-left: 11px;';
+    return '<div style="margin-bottom:6px;' + highlight + '">' +
+      '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">' +
+      '<span style="font-weight:' + (r.selected ? '700' : '500') + ';">' + (i+1) + '. ' + r.name + '</span>' +
+      '<span style="font-weight:600;">' + fmt(r.tw) + '</span></div>' +
+      '<div style="height:4px;background:var(--color-border-light,#ebecf0);border-radius:2px;overflow:hidden;">' +
+      '<div style="height:100%;width:' + pct + '%;background:var(--primary);border-radius:2px;"></div></div></div>';
+  }).join('');
+}
+
+function renderCountryTrend() {
+  const d = countryPopData[selectedCountry];
+  if (!d) return;
+
+  const twData = d.pop.map(p => Math.round(p * d.twShare));
+
+  Highcharts.chart('chart-country-trend', {
+    chart: { type: 'area', backgroundColor: 'transparent', height: 200 },
+    title: { text: d.name + ' — Temp Workers', style: { fontSize: '13px' } },
+    xAxis: { categories: mapYears.map(y => 'FY' + y), labels: { style: { fontSize: '10px' } } },
+    yAxis: { title: { text: null }, labels: { format: '{value:,.0f}', style: { fontSize: '10px' } } },
+    tooltip: { pointFormat: '{point.y:,.0f} workers' },
+    plotOptions: { area: { fillOpacity: 0.15, marker: { radius: 4 } } },
+    series: [{ name: 'Temp Workers', data: twData, color: '#0052CC' }],
+    legend: { enabled: false },
+    credits: { enabled: false },
+  });
+}
+
+mapYearSlider.addEventListener('input', renderMap);
+mapMetric.addEventListener('change', () => { mapChart = null; document.getElementById('chart-map').innerHTML = ''; renderMap(); });
+
+mapPlayBtn.addEventListener('click', () => {
+  if (mapPlaying) {
+    clearInterval(mapInterval);
+    mapPlaying = false;
+    mapPlayBtn.textContent = '▶ Play';
+  } else {
+    mapPlaying = true;
+    mapPlayBtn.textContent = '⏸ Pause';
+    let yr = parseInt(mapYearSlider.value);
+    mapInterval = setInterval(() => {
+      yr++;
+      if (yr > 2024) yr = 2019;
+      mapYearSlider.value = yr;
+      renderMap();
+    }, 1200);
+  }
+});
+
+// Initialize map when tab is shown
+document.querySelector('[data-tab="map"]').addEventListener('click', () => {
+  setTimeout(() => { if (!mapChart) renderMap(); }, 100);
+});
+
+
+// ====== RESOURCES ======
+const resources = {
+  data: [
+    {
+      title: 'Temp Workers Charts and Data.xlsx',
+      description: 'Primary dataset containing historical H-1B, H-2A, and H-2B visa volumes (2020–2024) and linear regression projections through 2032. Source of baseline scenario data.',
+      tags: ['Primary Data', 'H-1B', 'H-2A', 'H-2B', '2020–2032'],
+      icon: '📊',
+      url: null,
+      usedFor: 'Baseline projections, historical trends, KPI calculations',
+    },
+    {
+      title: 'Nonimmigrant Visa Statistics — U.S. Department of State',
+      description: 'Official U.S. State Department portal with nonimmigrant visa issuance data by class, nationality, and fiscal year (FY1997–2024). Includes H-1B, H-2A, H-2B workload reports, refusal rates, and multi-year detail tables in PDF and Excel format.',
+      tags: ['Official Government Data', 'FY1997–2024', 'Visa Issuances', 'Refusal Rates', 'By Nationality'],
+      icon: '🏛️',
+      url: 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-statistics/nonimmigrant-visa-statistics.html',
+      usedFor: 'Authoritative source for historical visa issuance volumes; validation of H-1B, H-2A, H-2B trends',
+    },
+    {
+      title: 'Population Estimates for Nonimmigrants Residing in the United States: FY 2019–2024',
+      description: 'Baker, B. (2025). DHS Office of Homeland Security Statistics. Estimates resident nonimmigrant population using matched arrival/departure records. Key findings: Temp worker population grew steadily at ~60K/year (1.42M→1.70M), showed remarkable COVID resilience vs. students (-20%). India = 47% of temp workers, Mexico = 22%. H-1B: 440K residents, H-2A: 160K, H-2B: 70K (FY2019).',
+      tags: ['DHS Official', 'Resident Population', 'FY2019–2024', 'COVID Resilience', 'Country of Origin'],
+      icon: '🏛️',
+      url: 'https://ohss.dhs.gov/topics/immigration/nonimmigrant/population-estimates/fy24-nonimmigrant-pop-est',
+      usedFor: 'Resident population context, COVID resilience validation, country-of-origin demographics, stock-vs-flow analysis',
+    },
+  ],
+  articles: [
+    {
+      title: 'The current research landscape of disaster-induced migration: A systematic review and bibliometric analysis',
+      description: 'Chumky et al. (2022). Systematic review published in International Journal of Disaster Risk Reduction. Explores mechanisms of disaster-induced migration across global contexts.',
+      tags: ['Natural Disaster', 'Migration', 'Systematic Review', 'ScienceDirect'],
+      icon: '📄',
+      url: 'https://www.sciencedirect.com/science/article/abs/pii/S2212420922001509',
+      usedFor: 'Natural disaster scenario calibration',
+    },
+    {
+      title: 'Human mobility under disasters: A systematic review and framework for equitable and resilient mobility governance',
+      description: 'Huang et al. (2025). Nature npj Natural Hazards. Reviews 946 studies on disaster-induced mobility. Key findings: 24M displaced annually, 92% climate-related, physical-presence sectors hit hardest, agricultural systems show complex disruption patterns.',
+      tags: ['Natural Disaster', 'Labor Mobility', '946 Studies', 'Nature'],
+      icon: '📄',
+      url: 'https://www.nature.com/articles/s44304-025-00153-9',
+      usedFor: 'Validated sector-differentiated impacts: H-2A/H-2B disproportionately affected, H-1B insulated, post-disaster rebuilding surge',
+    },
+    {
+      title: 'Temporary Professional Foreign Workers: Background, Trends, and Policy Issues (CRS R47159)',
+      description: 'Wilson, J.H. (2022). Congressional Research Service. Comprehensive analysis of temp professional worker visa programs. Key findings: visas doubled from ~200K (1997) to ~425K (2019); procyclical demand pattern confirmed; COVID caused 43% drop in professional worker visas vs. 54% total NIV decline; ~70K/yr change status internally (44K students→H-1B).',
+      tags: ['CRS', 'H-1B Policy', 'Procyclical', 'COVID Impact', 'Congress'],
+      icon: '📄',
+      url: 'https://www.congress.gov/crs_external_products/R/PDF/R47159/R47159.2.pdf',
+      usedFor: 'Procyclical demand validation for recession scenario; H-1B crisis sensitivity (-43% COVID benchmark); policy restriction scenario grounding; temp-to-permanent pipeline context',
+    },
+  ],
+  methods: [
+    {
+      title: 'Baseline Projection Methodology',
+      description: 'Linear regression on 2020–2024 historical data for each visa category independently. Growth rates: H-1B ~+23.7K/yr, H-2A ~+25.5K/yr, H-2B ~+19.4K/yr. Validated against DHS resident population growth rate (~60K/yr aggregate for all temp worker categories).',
+      tags: ['Linear Regression', 'Per-Category', 'DHS-Validated'],
+      icon: '⚙️',
+      url: null,
+      usedFor: 'All projected values (2025–2032)',
+    },
+    {
+      title: 'Scenario Modeling Approach',
+      description: 'Scenarios apply category-specific multipliers to baseline projections. Multipliers are calibrated using: (1) policy precedent for restriction/expansion, (2) recession historical patterns, (3) academic research for disaster/instability impacts.',
+      tags: ['What-If Analysis', 'Multiplier Model'],
+      icon: '⚙️',
+      url: null,
+      usedFor: 'All 6 scenario projections',
+    },
+    {
+      title: 'Stock vs. Flow Analysis (DHS Population Estimates)',
+      description: 'Visa issuances (this dashboard\'s primary metric) represent annual flow — new entries per year. DHS resident population estimates represent stock — total people present at any time. In FY2024: ~675K visas issued vs. 1.7M residents present, because H-1B workers can stay 6+ years and H-2A/H-2B workers make multiple seasonal entries. Flow metrics are more sensitive to policy/economic shocks.',
+      tags: ['Stock vs Flow', 'Interpretation Guide'],
+      icon: '⚙️',
+      url: null,
+      usedFor: 'Context for interpreting visa volume projections vs. total workforce impact',
+    },
+    {
+      title: 'Key Research-Informed Parameters',
+      description: 'From Huang et al. (2025): Physical-presence sectors suffer disproportionately (~40% H-2A impact), knowledge work resilient (~10% H-1B impact). Recovery timescales: days–weeks for localized events, months for prolonged crises. Post-disaster demand surge confirmed by "economic creative destruction" findings. From CRS R47159: H-1B professional visas dropped 43% during COVID (real-world crisis benchmark); procyclical demand pattern confirmed; ~70K/yr internal status changes add pipeline pressure.',
+      tags: ['Evidence-Based', 'Calibration', 'CRS-Validated'],
+      icon: '⚙️',
+      url: null,
+      usedFor: 'Natural disaster & political instability scenario parameters; recession scenario calibration (-43% H-1B benchmark)',
+    },
+  ],
+};
+
+function renderResources() {
+  const sections = { data: 'resource-data', articles: 'resource-articles', methods: 'resource-methods' };
+  const iconClasses = { data: 'data', articles: 'article', methods: 'method' };
+
+  Object.entries(sections).forEach(([key, elId]) => {
+    const container = document.getElementById(elId);
+    if (!container) return;
+    const items = resources[key];
+    container.innerHTML = items.map(item => `
+      <div class="resource-item">
+        <div class="resource-icon ${iconClasses[key]}">${item.icon}</div>
+        <div class="resource-info">
+          <div class="title">${item.url ? '<a href="' + item.url + '" target="_blank">' + item.title + '</a>' : item.title}</div>
+          <div class="description">${item.description}</div>
+          <div class="tags">
+            ${item.tags.map(t => '<span class="resource-tag">' + t + '</span>').join('')}
+          </div>
+          <div class="description" style="margin-top:4px;font-style:italic;">Used for: ${item.usedFor}</div>
+        </div>
+      </div>
+    `).join('') + '<div class="resource-count">📎 ' + items.length + ' source' + (items.length !== 1 ? 's' : '') + ' in this category</div>';
+  });
+}
+
+renderResources();
+
+
+
+// ====== FILE UPLOAD HANDLER ======
+
+const uploadArea = document.getElementById('upload-area');
+const fileInput = document.getElementById('file-input');
+const uploadBtn = document.getElementById('upload-btn');
+const uploadStatus = document.getElementById('upload-status');
+const uploadPanel = document.getElementById('upload-panel');
+const uploadFilename = document.getElementById('upload-filename');
+const uploadPreview = document.getElementById('upload-preview');
+const uploadRemove = document.getElementById('upload-remove');
+
+uploadBtn.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+uploadArea.addEventListener('click', () => fileInput.click());
+
+uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+
+fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+uploadRemove.addEventListener('click', () => {
+  uploadedData = null;
+  uploadArea.style.display = '';
+  uploadStatus.style.display = 'none';
+  fileInput.value = '';
+  renderCustom();
+});
+
+function handleFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['csv', 'tsv', 'xlsx', 'xls'].includes(ext)) {
+    alert('Please upload a CSV, TSV, or Excel file.');
+    return;
+  }
+
+  uploadFilename.textContent = file.name;
+  uploadArea.style.display = 'none';
+  uploadStatus.style.display = '';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    parseCSV(text, file.name);
+  };
+
+  if (ext === 'csv' || ext === 'tsv') {
+    reader.readAsText(file);
+  } else {
+    // For Excel files, show a message that only CSV is processed client-side
+    uploadPreview.innerHTML = '<div style="padding:8px;color:var(--warning);">⚠️ Excel files require server-side processing. Please save as CSV for client-side analysis.</div>';
+    uploadedData = null;
+  }
+}
+
+function parseCSV(text, filename) {
+  const lines = text.trim().split(/\r?\n/);
+  const sep = text.includes('\t') ? '\t' : ',';
+  const headers = lines[0].split(sep).map(h => h.trim().replace(/["\']/g, ''));
+  const rows = lines.slice(1).map(l => l.split(sep).map(c => c.trim().replace(/["\']/g, '')));
+
+  // Try to identify columns
+  const yearCol = headers.findIndex(h => /year/i.test(h));
+  const h1bCol = headers.findIndex(h => /h.?1.?b/i.test(h));
+  const h2aCol = headers.findIndex(h => /h.?2.?a/i.test(h));
+  const h2bCol = headers.findIndex(h => /h.?2.?b/i.test(h));
+  const totalCol = headers.findIndex(h => /total/i.test(h));
+
+  if (yearCol === -1) {
+    uploadPreview.innerHTML = '<div style="padding:8px;color:var(--error);">❌ Could not find a "Year" column. Please ensure your CSV has a Year column.</div>';
+    uploadedData = null;
+    return;
+  }
+
+  const parsed = { years: [], h1b: [], h2a: [], h2b: [], total: [], hasCategories: false };
+
+  rows.forEach(row => {
+    if (!row[yearCol] || isNaN(parseInt(row[yearCol]))) return;
+    const yr = parseInt(row[yearCol]);
+    parsed.years.push(yr);
+
+    if (h1bCol >= 0 && h2aCol >= 0 && h2bCol >= 0) {
+      parsed.hasCategories = true;
+      const v1 = parseFloat(row[h1bCol].replace(/,/g, '')) || 0;
+      const v2 = parseFloat(row[h2aCol].replace(/,/g, '')) || 0;
+      const v3 = parseFloat(row[h2bCol].replace(/,/g, '')) || 0;
+      parsed.h1b.push(v1);
+      parsed.h2a.push(v2);
+      parsed.h2b.push(v3);
+      parsed.total.push(v1 + v2 + v3);
+    } else if (totalCol >= 0) {
+      parsed.total.push(parseFloat(row[totalCol].replace(/,/g, '')) || 0);
+    }
+  });
+
+  if (parsed.years.length === 0) {
+    uploadPreview.innerHTML = '<div style="padding:8px;color:var(--error);">❌ No valid data rows found.</div>';
+    uploadedData = null;
+    return;
+  }
+
+  uploadedData = parsed;
+
+  // Show preview table
+  let previewHTML = '<table><tr><th>Year</th>';
+  if (parsed.hasCategories) previewHTML += '<th>H-1B</th><th>H-2A</th><th>H-2B</th>';
+  previewHTML += '<th>Total</th></tr>';
+  parsed.years.forEach((yr, i) => {
+    previewHTML += '<tr><td style="text-align:left;font-weight:600;">' + yr + '</td>';
+    if (parsed.hasCategories) {
+      previewHTML += '<td>' + fmt(parsed.h1b[i]) + '</td>';
+      previewHTML += '<td>' + fmt(parsed.h2a[i]) + '</td>';
+      previewHTML += '<td>' + fmt(parsed.h2b[i]) + '</td>';
+    }
+    previewHTML += '<td><strong>' + fmt(parsed.total[i]) + '</strong></td></tr>';
+  });
+  previewHTML += '</table>';
+  previewHTML += '<div style="margin-top:8px;font-size:11px;color:var(--color-text-muted);">✓ ' + parsed.years.length + ' rows parsed. Data overlaid on chart below.</div>';
+  uploadPreview.innerHTML = previewHTML;
+
+  renderCustom();
+}
+
+</script>
+
+</body>
+</html>
